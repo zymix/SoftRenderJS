@@ -1,3 +1,15 @@
+var Utils;
+var Utils = (function(Utils) {
+    Utils.interpolate = function(min, max, gradient) {
+        return min + (max - min) * Utils.clamp(gradient);
+    }
+    Utils.clamp = function(value, min, max) {
+        if (typeof min === "undefined") { min = 0; }
+        if (typeof max === "undefined") { max = 1; }
+        return Math.max(min, Math.min(value, max));
+    };
+})(Utils || (Utils={}));
+
 var Color4 = (function() {
     function Color4(initialR, initialG, initialB, initialA) {
         this.r = initialR;

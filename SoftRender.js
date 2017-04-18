@@ -16,6 +16,7 @@ var SoftRender;
             this.B = b;
             this.C = c;
         }
+
         return Face;
     });
     SoftRender.Face = Face;
@@ -39,21 +40,32 @@ var SoftRender;
             this.workigWidth = canvas.width;
             this.workigHeight = canvas.height;
             this.workingContext = this.workigCanvas.getContext("2d");
+            this.depthbuffer = new Array(this.workigWidth * this.workigHeight);
         };
         //清除缓冲区为黑色（默认）
         Device.prototype.clear = function() {
             this.workingContext.clearRect(0, 0, this.workigWidth, this.workigHeight);
             this.backbuffer = this.workingContext.getImageData(0, 0, this.workigWidth, this.workigHeight);
+            for (var i = 0; i < this.depthbuffer.length; i++) {
+                this.depthbuffer[i] = 10000000;
+            }
         };
         //刷新前缓冲区
         Device.prototype.present = function() {
             this.workingContext.putImageData(this.backbuffer, 0, 0);
         };
         //像素着色
-        Device.prototype.putPixel = function(x, y, color) {
+        Device.prototype.putPixel = function(x, y, z, color) {
             this.backbufferdata = this.backbuffer.data;
             //注意这个的缓冲数据是一位数组
-            var index = ((x >> 0) + (y >> 0) * this.workigWidth) * 4;
+            var index = ((x >> 0) + (y >> 0) * this.workigWidth);
+            //开启深度测试
+            if (this.depthbuffer[index] < z) {
+                return;
+            }
+            //通过深度测试则重置深度值
+            this.depthbuffer[index] = z;
+            index *= 4
             this.backbufferdata[index] = color.r * 255;
             this.backbufferdata[index + 1] = color.g * 255;
             this.backbufferdata[index + 2] = color.b * 255;
@@ -66,12 +78,12 @@ var SoftRender;
             // 需要重新计算坐标使起始点变成左上角
             var x = point.x * this.workigWidth + this.workigWidth / 2.0 >> 0;
             var y = -point.y * this.workigHeight + this.workigHeight / 2.0 >> 0;
-            return new Vector2(x, y);
+            return new Vector3(x, y, point.z);
         };
         //封装，越界检测
-        Device.prototype.drawPoint = function(point) {
+        Device.prototype.drawPoint = function(point, color) {
             if (point.x >= 0 && point.y >= 0 && point.x < this.workigWidth && point.y < this.workigHeight) {
-                this.putPixel(point.x, point.y, new Color4(1, 1, 0, 1));
+                this.putPixel(point.x, point.y, point.z, color);
             }
         };
         Device.prototype.render = function(camera, meshes) {
@@ -95,9 +107,11 @@ var SoftRender;
                     var pB = this.project(mesh.Vertices[face.B], mat);
                     var pC = this.project(mesh.Vertices[face.C], mat);
 
-                    this.drawLine(pA, pB);
-                    this.drawLine(pB, pC);
-                    this.drawLine(pC, pA);
+                    // this.drawLine(pA, pB);
+                    // this.drawLine(pB, pC);
+                    // this.drawLine(pC, pA);
+                    var color = 0.25 + ((i % mesh.Faces.length) / mesh.Faces.length) * 0.75;
+                    this.drawTriangle(pA, pB, pC, new Color4(color, color, color, 1));
                 }
             }
         };
@@ -178,14 +192,70 @@ var SoftRender;
                     var a = indicesArray[i * 3];
                     var b = indicesArray[i * 3 + 1];
                     var c = indicesArray[i * 3 + 2];
-                    mesh.Faces[i] = {A:a, B:b, C:c};
+                    mesh.Faces[i] = { A: a, B: b, C: c };
                 }
-                var pos = jsonObject.meshes[meshIndex].position;
-                //mesh.Position = new Vector3(pos[0], pos[1], pos[2]);
-
+                // var pos = jsonObject.meshes[meshIndex].position;
+                // mesh.Position = new Vector3(pos[0], pos[1], pos[2]);
+                // var ro = jsonObject.meshes[meshIndex].rotation;
+                mesh.Rotation = new Vector3(135, -45, 0);
                 meshes.push(mesh);
             }
             return meshes;
+        };
+        //通过重心坐标系实现三角形光栅化
+        Device.prototype.drawTriangle = function(p0, p1, p2, color) {
+            var xmin = Math.floor(Math.min(p0.x, p1.x, p2.x));
+            var ymin = Math.floor(Math.min(p0.y, p1.y, p2.y));
+            var xmax = Math.ceil(Math.max(p0.x, p1.x, p2.x));
+            var ymax = Math.ceil(Math.max(p0.y, p1.y, p2.y));
+            //直线方程p0p1
+            // var a01 = (p0.y - p1.y);
+            // var b01 = (p1.x - p0.x);
+            // var c01 = p0.x * p1.y - p1.x * p0.y;
+            // var f01 = a01 * p2.x + b01 * p2.y + c01;
+            //直线方程p2p0
+            var a20 = (p2.y - p0.y);
+            var b20 = (p0.x - p2.x);
+            var c20 = p2.x * p0.y - p0.x * p2.y;
+            var f20 = a20 * p1.x + b20 * p1.y + c20;
+            //直线方程p1p2
+            var a12 = (p1.y - p2.y);
+            var b12 = (p2.x - p1.x);
+            var c12 = p1.x * p2.y - p2.x * p1.y;
+            var f12 = a12 * p0.x + b12 * p0.y + c12;
+
+            var zero = 0.000001;
+            //避免下面除零错误
+            if (Math.abs(f20) < zero || Math.abs(f12) < zero) {
+                return;
+            }
+            var fa = 1 / f12;
+            var fb = 1 / f20;
+
+            //优化迭代，递增
+            var oa = a12 * (xmin - 1) + b12 * (ymin - 1) + c12;
+            var ob = a20 * (xmin - 1) + b20 * (ymin - 1) + c20;
+            for (var y = ymin; y <= ymax; ++y) {
+                oa += b12;
+                ob += b20;
+                var tmpa = oa;
+                var tmpb = ob;
+                for (var x = xmin; x <= xmax; ++x) {
+                    tmpa += a12;
+                    tmpb += a20;
+                    var a = tmpa * fa;
+                    var b = tmpb * fb;
+                    // var a = (a12 * (xmin) + b12 * (ymin) + c12)* fa;
+                    // var b = (a20 * (xmin) + b20 * (ymin) + c20)* fb;
+                    var c = 1 - a - b;
+                    if (a >= 0 && b >= 0 && c >= 0) {
+                        //着色
+                        var z = a * p0.z + b * p1.z + c * p2.z;
+                        this.drawPoint(new Vector3(x, y, z), color);
+                    }
+                }
+            }
+
         };
         return Device;
     })();
