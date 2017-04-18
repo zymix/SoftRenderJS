@@ -129,6 +129,64 @@ var SoftRender;
                 }
             }
         };
+
+        //异步加载JSON文件
+        Device.prototype.LoadJSONFileAsync = function(filename, callback) {
+            var jsonObject = {};
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.open("GET", filename, true);
+            var that = this;
+            xmlhttp.onreadystatechange = function() {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+
+                    jsonObject = JSON.parse(xmlhttp.responseText);
+                    callback(that.CreateMeshesFromJson(jsonObject));
+                }
+            };
+            xmlhttp.send(null);
+        };
+        //解析JSON对象创建网格
+        Device.prototype.CreateMeshesFromJson = function(jsonObject) {
+            var meshes = [];
+            for (var meshIndex = 0; meshIndex < jsonObject.meshes.length; meshIndex++) {
+                var verticesArray = jsonObject.meshes[meshIndex].vertices;
+                var indicesArray = jsonObject.meshes[meshIndex].indices;
+                var uvCount = jsonObject.meshes[meshIndex].uvCount;
+                var verticesStep = 1;
+                // 取决于纹理坐标的数量，我们动态的选择6步进、8步进以及10步进值  
+                switch (uvCount) {
+                    case 0:
+                        verticesStep = 6;
+                        break;
+                    case 1:
+                        verticesStep = 8;
+                        break;
+                    case 2:
+                        verticesStep = 10;
+                        break;
+                }
+                var verticesCount = verticesArray.length / verticesStep;
+                var facesCount = indicesArray.length / 3;
+                var mesh = new SoftRender.Mesh(jsonObject.meshes[meshIndex].name, verticesCount, facesCount);
+                for (var i = 0; i < verticesCount; i++) {
+                    var x = verticesArray[i * verticesStep];
+                    var y = verticesArray[i * verticesStep + 1];
+                    var z = verticesArray[i * verticesStep + 2];
+                    mesh.Vertices[i] = new Vector3(x, y, z);
+                }
+                for (var i = 0; i < facesCount; i++) {
+                    var a = indicesArray[i * 3];
+                    var b = indicesArray[i * 3 + 1];
+                    var c = indicesArray[i * 3 + 2];
+                    mesh.Faces[i] = {A:a, B:b, C:c};
+                }
+                var pos = jsonObject.meshes[meshIndex].position;
+                //mesh.Position = new Vector3(pos[0], pos[1], pos[2]);
+
+                meshes.push(mesh);
+            }
+            return meshes;
+        };
         return Device;
     })();
     SoftRender.Device = Device;
