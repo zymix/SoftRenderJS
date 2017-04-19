@@ -1,5 +1,5 @@
 var Utils;
-var Utils = (function(Utils) {
+(function(Utils) {
     Utils.interpolate = function(min, max, gradient) {
         return min + (max - min) * Utils.clamp(gradient);
     }
@@ -8,7 +8,13 @@ var Utils = (function(Utils) {
         if (typeof max === "undefined") { max = 1; }
         return Math.max(min, Math.min(value, max));
     };
-})(Utils || (Utils={}));
+    // 计算向量之间角度的余弦，返回0到1之间的值
+    Utils.computeNdotL = function(n, l) {
+        var tmpN = Vector3.Normalize(n);
+        var tmpL = Vector3.Normalize(l);
+        return Math.max(0, Vector3.Dot(tmpN, tmpL));
+    };
+})(Utils || (Utils = {}));
 
 var Color4 = (function() {
     function Color4(initialR, initialG, initialB, initialA) {
@@ -187,7 +193,8 @@ var Vector3 = (function() {
     };
     Vector3.Normalize = function Normalize(vector) {
         var v = Vector3.Copy(vector);
-        return v.normalize();
+        v.normalize();
+        return v;
     };
     Vector3.Distance = function Distance(v1, v2) {
         return Math.sqrt(Vector3.DistanceSquare(v1, v2));
@@ -429,7 +436,7 @@ var Matrix = (function() {
         zAxis.normalize();
         var xAxis = Vector3.Cross(zAxis, up);
         xAxis.normalize();
-        var yAxis = Vector3.Cross(zAxis, xAxis);
+        var yAxis = Vector3.Cross(xAxis, zAxis);
         yAxis.normalize();
         var ex = -Vector3.Dot(eye, xAxis);
         var ey = -Vector3.Dot(eye, yAxis);
