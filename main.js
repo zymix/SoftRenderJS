@@ -2,7 +2,10 @@ var meshes = [];
 var mesh;
 var device;
 var mera;
-
+var previousDate = Date.now();
+var lastFPSValues = new Array(60);
+var divCurrentFPS;
+var divAverageFPS;
 document.addEventListener("DOMContentLoaded", init, false);
 
 window.requestAnimationFrame = (function() {
@@ -15,6 +18,8 @@ window.requestAnimationFrame = (function() {
 
 function init(){
 	canvas = document.getElementById("gameCanvas");
+	divCurrentFPS = document.getElementById("currentFPS");
+	divAverageFPS = document.getElementById("averageFPS");
 	mera = new SoftRender.Camera();
 	device = new SoftRender.Device(canvas);
 	
@@ -22,31 +27,6 @@ function init(){
     mera.Target = new Vector3(0, 0, 0); 
 
 	device.LoadJSONFileAsync("monkey.json", LoadCompleteCallback);
-    // var mesh = new SoftRender.Mesh("Cube", 8, 12);
-    // meshes.push(mesh);
-    // mesh.Vertices[0] = new Vector3(-1, 1, 1);
-    // mesh.Vertices[1] = new Vector3(1, 1, 1);
-    // mesh.Vertices[2] = new Vector3(-1, -1, 1);
-    // mesh.Vertices[3] = new Vector3(1, -1, 1);
-    // mesh.Vertices[4] = new Vector3(-1, 1, -1);
-    // mesh.Vertices[5] = new Vector3(1, 1, -1);
-    // mesh.Vertices[6] = new Vector3(1, -1, -1);
-    // mesh.Vertices[7] = new Vector3(-1, -1, -1);
-    //
-    // mesh.Faces[0] = { A:0, B:1, C:2 };
-    // mesh.Faces[1] = { A:1, B:2, C:3 };
-    // mesh.Faces[2] = { A:1, B:3, C:6 };
-    // mesh.Faces[3] = { A:1, B:5, C:6 };
-    // mesh.Faces[4] = { A:0, B:1, C:4 };
-    // mesh.Faces[5] = { A:1, B:4, C:5 };
-    //
-    // mesh.Faces[6] = { A:2, B:3, C:7 };
-    // mesh.Faces[7] = { A:3, B:6, C:7 };
-    // mesh.Faces[8] = { A:0, B:2, C:7 };
-    // mesh.Faces[9] = { A:0, B:4, C:7 };
-    // mesh.Faces[10] = { A:4, B:5, C:6 };
-    // mesh.Faces[11] = { A:4, B:6, C:7 };
-    // requestAnimationFrame(drawLoop);
 }
 
 function LoadCompleteCallback(loadedMeshes){
@@ -55,6 +35,25 @@ function LoadCompleteCallback(loadedMeshes){
 }
 
 function drawLoop(){
+    var now = Date.now();
+    var currentFPS = 1000 / (now - previousDate);
+    previousDate = now;
+
+    divCurrentFPS.textContent = currentFPS.toFixed(2);
+
+    if (lastFPSValues.length < 60) {
+        lastFPSValues.push(currentFPS);
+    } else {
+        lastFPSValues.shift();
+        lastFPSValues.push(currentFPS);
+        var totalValues = 0;
+        for (var i = 0; i < lastFPSValues.length; i++) {
+            totalValues += lastFPSValues[i];
+        }
+
+        var averageFPS = totalValues / lastFPSValues.length;
+        divAverageFPS.textContent = averageFPS.toFixed(2);
+    }
 	//清除上一帧内容
 	device.clear();
 
