@@ -28,7 +28,8 @@ var Shader;
     })();
     Shader.BaseShader = BaseShader;
 
-    //BaseShader子类
+    /**************************BaseShader子类****************************/
+    //平面着色
     var FlatShader = (function() {
         function FlatShader(device) {
             BaseShader.call(this, device);
@@ -60,11 +61,37 @@ var Shader;
             surfData.cos = Utils.computeNdotL(centerN, centerL);
             return surfData;
         }
-        FlatShader.prototype.fragShader = function(pa, pb, pc, data) {
+        FlatShader.prototype.fragShader = function(p, data) {
             var cos = data.surfData.cos;
             return new Color4(cos, cos, cos, 1);
         };
         return FlatShader;
     })();
     Shader.FlatShader = FlatShader;
+
+    //高氏着色
+    var GouraudShader  = (function(){
+        function GouraudShader(device){
+            BaseShader.call(this, device);
+        };
+        GouraudShader.prototype = Object.create(BaseShader.prototype);
+        GouraudShader.constructor = GouraudShader;
+        GouraudShader.prototype.vertShader= function(vertData, data) {
+            var p = {};
+            p.worldNormal = Vector3.TransformCoordinates(vertData.Normal, data.worldMat);
+            p.worldPoint = Vector3.TransformCoordinates(vertData.Position, data.worldMat);
+            p.projPoint = this.project(vertData.Position, data.mvpMat);
+
+            var lightDir = data.lightPos.subtract(p.worldPoint);
+            p.ndotl = Utils.computeNdotL(p.worldNormal, lightDir);
+            return p;
+        };
+        GouraudShader.prototype.fragShader = function(p, data) {
+            var ndotl = p.ndotl;
+            return new Color4(ndotl, ndotl, ndotl, 1);
+        };
+        return GouraudShader;
+    })();
+    Shader.GouraudShader = GouraudShader;
+
 })(Shader || (Shader = {}));

@@ -1,7 +1,7 @@
 var SoftRender;
-(function(SoftRender) {
+(function (SoftRender) {
     //定义相机
-    var Camera = (function() {
+    var Camera = (function () {
         function Camera() {
             this.Position = Vector3.Zero();
             this.Target = Vector3.Zero();
@@ -10,7 +10,7 @@ var SoftRender;
     })();
     SoftRender.Camera = Camera;
     //定义面片
-    var Face = (function() {
+    var Face = (function () {
         function Face(a, b, c) {
             this.A = a;
             this.B = b;
@@ -21,7 +21,7 @@ var SoftRender;
     });
     SoftRender.Face = Face;
     //定义网格
-    var Mesh = (function() {
+    var Mesh = (function () {
         function Mesh(name, verticesCount, facesCount) {
             this.name = name;
             this.Vertices = new Array(verticesCount);
@@ -34,7 +34,7 @@ var SoftRender;
     SoftRender.Mesh = Mesh;
 
     //定义渲染设备
-    var Device = (function() {
+    var Device = (function () {
         function Device(canvas) {
             this.workigCanvas = canvas;
             this.workigWidth = canvas.width;
@@ -43,7 +43,7 @@ var SoftRender;
             this.depthbuffer = new Array(this.workigWidth * this.workigHeight);
         };
         //清除缓冲区为黑色（默认）
-        Device.prototype.clear = function() {
+        Device.prototype.clear = function () {
             this.workingContext.clearRect(0, 0, this.workigWidth, this.workigHeight);
             this.backbuffer = this.workingContext.getImageData(0, 0, this.workigWidth, this.workigHeight);
             for (var i = 0; i < this.depthbuffer.length; i++) {
@@ -51,11 +51,11 @@ var SoftRender;
             }
         };
         //刷新前缓冲区
-        Device.prototype.present = function() {
+        Device.prototype.present = function () {
             this.workingContext.putImageData(this.backbuffer, 0, 0);
         };
         //像素着色
-        Device.prototype.putPixel = function(x, y, z, color) {
+        Device.prototype.putPixel = function (x, y, z, color) {
             this.backbufferdata = this.backbuffer.data;
             //注意这个的缓冲数据是一位数组
             var index = ((x >> 0) + (y >> 0) * this.workigWidth);
@@ -81,12 +81,12 @@ var SoftRender;
         //     return new Vector3(x, y, point.z);
         // };
         //封装，越界检测
-        Device.prototype.drawPoint = function(point, color) {
+        Device.prototype.drawPoint = function (point, color) {
             if (point.x >= 0 && point.y >= 0 && point.x < this.workigWidth && point.y < this.workigHeight) {
                 this.putPixel(point.x, point.y, point.z, color);
             }
         };
-        Device.prototype.render = function(camera, meshes) {
+        Device.prototype.render = function (camera, meshes) {
             var data = {};
             var viewMat = Matrix.LookAtLH(camera.Position, camera.Target, Vector3.Up());
             var projMat = Matrix.PerspectiveFovLH(0.78, this.workigWidth / this.workigHeight, 0.01, 1.0);
@@ -97,7 +97,7 @@ var SoftRender;
                 var mesh = meshes[i];
                 //计算世界坐标系的变换矩阵SRT
                 var worldMat = Matrix.RotationYawPitchRoll(
-                        mesh.Rotation.y, mesh.Rotation.x, mesh.Rotation.z)
+                    mesh.Rotation.y, mesh.Rotation.x, mesh.Rotation.z)
                     .multiply(Matrix.Translation(
                         mesh.Position.x, mesh.Position.y, mesh.Position.z));
                 //mvp变换矩阵
@@ -105,11 +105,12 @@ var SoftRender;
                 // 自定义一个光照位置
                 data.worldMat = worldMat;
                 data.mvpMat = mvpMat;
-
-                this.renderPipeline(mesh, new Shader.FlatShader(this), data);
+                //var shaderProgram = new Shader.FlatShader(this);
+                var shaderProgram = new Shader.GouraudShader(this);
+                this.renderPipeline(mesh, shaderProgram, data);
             }
         };
-        Device.prototype.renderPipeline = function(mesh, shaderProgram, data) {
+        Device.prototype.renderPipeline = function (mesh, shaderProgram, data) {
             var vertArr = mesh.Vertices;
             for (var i = 0; i < mesh.Faces.length; i++) {
                 var face = mesh.Faces[i];
@@ -120,15 +121,15 @@ var SoftRender;
                 var pA = shaderProgram.vertShader(va, data);
                 var pB = shaderProgram.vertShader(vb, data);
                 var pC = shaderProgram.vertShader(vc, data);
-                if(shaderProgram.surfShader!== null){
+                if (shaderProgram.surfShader != null) {
                     data.surfData = shaderProgram.surfShader(pA, pB, pC, data);
                 }
-                
+
                 this.drawTriangle(pA, pB, pC, shaderProgram.fragShader, data);
             }
         };
         //通过重心坐标系实现三角形光栅化
-        Device.prototype.drawTriangle = function(pa, pb, pc, fragShader, data) {
+        Device.prototype.drawTriangle = function (pa, pb, pc, fragShader, data) {
             var p0 = pa.projPoint;
             var p1 = pb.projPoint;
             var p2 = pc.projPoint;
@@ -171,16 +172,20 @@ var SoftRender;
                     var c = 1 - a - b;
                     if (a >= 0 && b >= 0 && c >= 0) {
                         //着色
+                        //光栅化的像素点
                         var z = a * p0.z + b * p1.z + c * p2.z;
+                        var newp = {};
                         var pixel = new Vector3(x, y, z);
-                        var color = fragShader(pa, pb, pc, data);
+                        newp.ndotl = a * pa.ndotl + b * pb.ndotl + c * pc.ndotl;
+                        newp.pixel = pixel;
+                        var color = fragShader(newp, data);
                         this.drawPoint(pixel, color);
                     }
                 }
             }
         };
         //渲染直线
-        Device.prototype.drawLine = function(p1, p2) {
+        Device.prototype.drawLine = function (p1, p2) {
             var x1 = p1.x >> 0;
             var x2 = p2.x >> 0;
             var y1 = p1.y >> 0;
@@ -208,12 +213,12 @@ var SoftRender;
         };
 
         //异步加载JSON文件
-        Device.prototype.LoadJSONFileAsync = function(filename, callback) {
+        Device.prototype.LoadJSONFileAsync = function (filename, callback) {
             var jsonObject = {};
             var xmlhttp = new XMLHttpRequest();
             xmlhttp.open("GET", filename, true);
             var that = this;
-            xmlhttp.onreadystatechange = function() {
+            xmlhttp.onreadystatechange = function () {
                 if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
 
                     jsonObject = JSON.parse(xmlhttp.responseText);
@@ -223,7 +228,7 @@ var SoftRender;
             xmlhttp.send(null);
         };
         //解析JSON对象创建网格
-        Device.prototype.CreateMeshesFromJson = function(jsonObject) {
+        Device.prototype.CreateMeshesFromJson = function (jsonObject) {
             var meshes = [];
             for (var meshIndex = 0; meshIndex < jsonObject.meshes.length; meshIndex++) {
                 var verticesArray = jsonObject.meshes[meshIndex].vertices;
@@ -264,7 +269,7 @@ var SoftRender;
                 var a = indicesArray[i * 3];
                 var b = indicesArray[i * 3 + 1];
                 var c = indicesArray[i * 3 + 2];
-                mesh.Faces[i] = { A: a, B: b, C: c };
+                mesh.Faces[i] = {A: a, B: b, C: c};
             }
             // var pos = jsonObject.meshes[meshIndex].position;
             // mesh.Position = new Vector3(pos[0], pos[1], pos[2]);
