@@ -1,7 +1,7 @@
 var SoftRender;
-(function (SoftRender) {
+(function(SoftRender) {
     //定义相机
-    var Camera = (function () {
+    var Camera = (function() {
         function Camera() {
             this.Position = Vector3.Zero();
             this.Target = Vector3.Zero();
@@ -10,7 +10,7 @@ var SoftRender;
     })();
     SoftRender.Camera = Camera;
     //定义面片
-    var Face = (function () {
+    var Face = (function() {
         function Face(a, b, c) {
             this.A = a;
             this.B = b;
@@ -21,7 +21,7 @@ var SoftRender;
     });
     SoftRender.Face = Face;
     //定义网格
-    var Mesh = (function () {
+    var Mesh = (function() {
         function Mesh(name, verticesCount, facesCount) {
             this.name = name;
             this.Vertices = new Array(verticesCount);
@@ -34,7 +34,7 @@ var SoftRender;
     SoftRender.Mesh = Mesh;
 
     //定义渲染设备
-    var Device = (function () {
+    var Device = (function() {
         function Device(canvas) {
             this.workigCanvas = canvas;
             this.workigWidth = canvas.width;
@@ -43,24 +43,24 @@ var SoftRender;
             this.depthbuffer = new Array(this.workigWidth * this.workigHeight);
         };
         //清除缓冲区为黑色（默认）
-        Device.prototype.clear = function () {
+        Device.prototype.clear = function() {
             this.workingContext.clearRect(0, 0, this.workigWidth, this.workigHeight);
             this.backbuffer = this.workingContext.getImageData(0, 0, this.workigWidth, this.workigHeight);
             for (var i = 0; i < this.depthbuffer.length; i++) {
-                this.depthbuffer[i] = 10000000;
+                this.depthbuffer[i] = 0;
             }
         };
         //刷新前缓冲区
-        Device.prototype.present = function () {
+        Device.prototype.present = function() {
             this.workingContext.putImageData(this.backbuffer, 0, 0);
         };
         //像素着色
-        Device.prototype.putPixel = function (x, y, z, color) {
+        Device.prototype.putPixel = function(x, y, z, color) {
             this.backbufferdata = this.backbuffer.data;
             //注意这个的缓冲数据是一位数组
             var index = ((x >> 0) + (y >> 0) * this.workigWidth);
             //开启深度测试
-            if (this.depthbuffer[index] < z) {
+            if (this.depthbuffer[index] > z) {
                 return;
             }
             //通过深度测试则重置深度值
@@ -71,25 +71,16 @@ var SoftRender;
             this.backbufferdata[index + 2] = color.b * 255;
             this.backbufferdata[index + 3] = color.a * 255;
         };
-        //投影转换到设备坐标系
-        // Device.prototype.project = function(coord, transMat) {
-        //     // 进行坐标变换,变换后的坐标起始点是坐标系的中心点
-        //     var point = Vector3.TransformCoordinates(coord, transMat);
-        //     // 需要重新计算坐标使起始点变成左上角
-        //     var x = point.x * this.workigWidth + this.workigWidth / 2.0 >> 0;
-        //     var y = -point.y * this.workigHeight + this.workigHeight / 2.0 >> 0;
-        //     return new Vector3(x, y, point.z);
-        // };
         //封装，越界检测
-        Device.prototype.drawPoint = function (point, color) {
+        Device.prototype.drawPoint = function(point, color) {
             if (point.x >= 0 && point.y >= 0 && point.x < this.workigWidth && point.y < this.workigHeight) {
                 this.putPixel(point.x, point.y, point.z, color);
             }
         };
-        Device.prototype.render = function (camera, meshes) {
+        Device.prototype.render = function(camera, meshes) {
             var data = {};
             var viewMat = Matrix.LookAtLH(camera.Position, camera.Target, Vector3.Up());
-            var projMat = Matrix.PerspectiveFovLH(0.78, this.workigWidth / this.workigHeight, 0.01, 1.0);
+            var projMat = Matrix.PerspectiveFovLH(0.90, this.workigWidth / this.workigHeight, 0.01, 100.0);
             var lightPos = new Vector3(0, 10, 10);
 
             data.lightPos = lightPos;
@@ -97,7 +88,7 @@ var SoftRender;
                 var mesh = meshes[i];
                 //计算世界坐标系的变换矩阵SRT
                 var worldMat = Matrix.RotationYawPitchRoll(
-                    mesh.Rotation.y, mesh.Rotation.x, mesh.Rotation.z)
+                        mesh.Rotation.y, mesh.Rotation.x, mesh.Rotation.z)
                     .multiply(Matrix.Translation(
                         mesh.Position.x, mesh.Position.y, mesh.Position.z));
                 //mvp变换矩阵
@@ -110,8 +101,9 @@ var SoftRender;
                 this.renderPipeline(mesh, shaderProgram, data);
             }
         };
-        Device.prototype.renderPipeline = function (mesh, shaderProgram, data) {
+        Device.prototype.renderPipeline = function(mesh, shaderProgram, data) {
             var vertArr = mesh.Vertices;
+            data.texture = mesh.Texture;
             for (var i = 0; i < mesh.Faces.length; i++) {
                 var face = mesh.Faces[i];
 
@@ -129,7 +121,7 @@ var SoftRender;
             }
         };
         //通过重心坐标系实现三角形光栅化
-        Device.prototype.drawTriangle = function (pa, pb, pc, fragShader, data) {
+        Device.prototype.drawTriangle = function(pa, pb, pc, fragShader, data) {
             var p0 = pa.projPoint;
             var p1 = pb.projPoint;
             var p2 = pc.projPoint;
@@ -171,21 +163,32 @@ var SoftRender;
                     var b = tmpb * fb;
                     var c = 1 - a - b;
                     if (a >= 0 && b >= 0 && c >= 0) {
-                        //着色
-                        //光栅化的像素点
-                        var z = a * p0.z + b * p1.z + c * p2.z;
                         var newp = {};
-                        var pixel = new Vector3(x, y, z);
                         newp.ndotl = a * pa.ndotl + b * pb.ndotl + c * pc.ndotl;
+                        //光栅化的像素点, 注意下面对Z值进行透视修正插值1/z = a/z0 + b/z1 + c/z2
+                        var aOverZ0 = a / p0.z;
+                        var bOverZ1 = b / p1.z;
+                        var cOverZ2 = c / p2.z;
+                        var oneOverZ = aOverZ0 + bOverZ1 + cOverZ2;
+                        var pixel = new Vector3(x, y, oneOverZ);
+                        //纹理插值的透视修正
+                        var z = 1.0 / oneOverZ;
+                        var tu = (aOverZ0 * pa.uvCoord.x + bOverZ1 * pb.uvCoord.x + cOverZ2 * pc.uvCoord.x) *z;
+                        var tv = (aOverZ0 * pa.uvCoord.y + bOverZ1 * pb.uvCoord.y + cOverZ2 * pc.uvCoord.y) *z;
+                        // var u = (a * pa.uvCoord.x + b * pb.uvCoord.x + c * pc.uvCoord.x)*z;
+                        // var v = (a * pa.uvCoord.y + b * pb.uvCoord.y + c * pc.uvCoord.y)*z;
+
+                        newp.uvCoord = new Vector2(tu, tv);
+
                         newp.pixel = pixel;
-                        var color = fragShader(newp, data);
+                        var color = fragShader(newp, data);//着色
                         this.drawPoint(pixel, color);
                     }
                 }
             }
         };
         //渲染直线
-        Device.prototype.drawLine = function (p1, p2) {
+        Device.prototype.drawLine = function(p1, p2) {
             var x1 = p1.x >> 0;
             var x2 = p2.x >> 0;
             var y1 = p1.y >> 0;
@@ -213,12 +216,12 @@ var SoftRender;
         };
 
         //异步加载JSON文件
-        Device.prototype.LoadJSONFileAsync = function (filename, callback) {
+        Device.prototype.LoadJSONFileAsync = function(filename, callback) {
             var jsonObject = {};
             var xmlhttp = new XMLHttpRequest();
             xmlhttp.open("GET", filename, true);
             var that = this;
-            xmlhttp.onreadystatechange = function () {
+            xmlhttp.onreadystatechange = function() {
                 if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
 
                     jsonObject = JSON.parse(xmlhttp.responseText);
@@ -228,8 +231,21 @@ var SoftRender;
             xmlhttp.send(null);
         };
         //解析JSON对象创建网格
-        Device.prototype.CreateMeshesFromJson = function (jsonObject) {
+        Device.prototype.CreateMeshesFromJson = function(jsonObject) {
             var meshes = [];
+            var materials = [];
+
+            for (var materialIndex = 0; materialIndex < jsonObject.materials.length; ++materialIndex) {
+                var obj = jsonObject.materials[materialIndex];
+                var m = {};
+                m.Name = obj.name;
+                m.ID = obj.id;
+                if (obj.diffuseTexture) {
+                    m.DiffuseTextureName = obj.diffuseTexture.name;
+                }
+                materials[obj.id] = m;
+            }
+
             for (var meshIndex = 0; meshIndex < jsonObject.meshes.length; meshIndex++) {
                 var verticesArray = jsonObject.meshes[meshIndex].vertices;
                 var indicesArray = jsonObject.meshes[meshIndex].indices;
@@ -259,23 +275,37 @@ var SoftRender;
                     var nx = verticesArray[i * verticesStep + 3];
                     var ny = verticesArray[i * verticesStep + 4];
                     var nz = verticesArray[i * verticesStep + 5];
+                    var u = 0;
+                    var v = 0;
+                    if (uvCount > 0) {
+                        u = verticesArray[i * verticesStep + 6];
+                        v = verticesArray[i * verticesStep + 7];
+                    }
                     mesh.Vertices[i] = {
                         Position: new Vector3(x, y, z),
-                        Normal: new Vector3(nx, ny, nz)
+                        Normal: new Vector3(nx, ny, nz),
+                        UVCoord: new Vector2(u, v)
                     }
+
                 }
+
+                for (var i = 0; i < facesCount; i++) {
+                    var a = indicesArray[i * 3];
+                    var b = indicesArray[i * 3 + 1];
+                    var c = indicesArray[i * 3 + 2];
+                    mesh.Faces[i] = { A: a, B: b, C: c };
+                }
+                var pos = jsonObject.meshes[meshIndex].position;
+                mesh.Position = new Vector3(pos[0], pos[1], pos[2]);
+
+                //加载纹理
+                if (uvCount > 0) {
+                    var meshTextureID = jsonObject.meshes[meshIndex].materialId;
+                    var meshTextureName = materials[meshTextureID].DiffuseTextureName;
+                    mesh.Texture = new Texture(meshTextureName, 512, 512);
+                }
+                meshes.push(mesh);
             }
-            for (var i = 0; i < facesCount; i++) {
-                var a = indicesArray[i * 3];
-                var b = indicesArray[i * 3 + 1];
-                var c = indicesArray[i * 3 + 2];
-                mesh.Faces[i] = {A: a, B: b, C: c};
-            }
-            // var pos = jsonObject.meshes[meshIndex].position;
-            // mesh.Position = new Vector3(pos[0], pos[1], pos[2]);
-            // var ro = jsonObject.meshes[meshIndex].rotation;
-            //mesh.Rotation = new Vector3(135, -45, 0);
-            meshes.push(mesh);
             return meshes;
         };
         return Device;
