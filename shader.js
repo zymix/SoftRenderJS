@@ -17,11 +17,11 @@ var Shader;
         //投影转换到设备坐标系
         BaseShader.prototype.project = function(coord, transMat) {
             // 进行坐标变换,变换后的坐标起始点是坐标系的中心点
-            var point = Vector3.TransformCoordinates(coord, transMat);
+            var point = Vector3.TransformCoordinatesW(coord, transMat);
             // 需要重新计算坐标使起始点变成左上角
-            var x = point.x * this.device.workigWidth + this.device.workigWidth / 2.0;
-            var y = -point.y * this.device.workigHeight + this.device.workigHeight / 2.0;
-            return new Vector3(x, y, point.z);
+            point.x = point.x * this.device.workigWidth + this.device.workigWidth / 2.0;
+            point.y = -point.y * this.device.workigHeight + this.device.workigHeight / 2.0;
+            return point;
         };
 
         return BaseShader;
@@ -41,7 +41,6 @@ var Shader;
             p.worldNormal = Vector3.TransformNormal(vertData.Normal, data.worldMat);
             p.worldPoint = Vector3.TransformCoordinates(vertData.Position, data.worldMat);
             p.projPoint = this.project(vertData.Position, data.mvpMat);
-
             return p;
         };
         FlatShader.prototype.surfShader = function(pa, pb, pc, data) {
@@ -81,7 +80,7 @@ var Shader;
             p.worldNormal = Vector3.TransformCoordinates(vertData.Normal, data.worldMat);
             p.worldPoint = Vector3.TransformCoordinates(vertData.Position, data.worldMat);
             p.projPoint = this.project(vertData.Position, data.mvpMat);
-            p.uvCoord = vertData.UVCoord;
+            p.uvCoord = new Vector2(vertData.UVCoord.x, vertData.UVCoord.y);
             var lightDir = data.lightPos.subtract(p.worldPoint);
             p.ndotl = Utils.computeNdotL(p.worldNormal, lightDir);
             return p;

@@ -1,64 +1,70 @@
 var Utils;
-(function(Utils) {
-    Utils.interpolate = function(min, max, gradient) {
+(function (Utils) {
+    Utils.interpolate = function (min, max, gradient) {
         return min + (max - min) * Utils.clamp(gradient);
     }
-    Utils.clamp = function(value, min, max) {
-        if (typeof min === "undefined") { min = 0; }
-        if (typeof max === "undefined") { max = 1; }
+    Utils.clamp = function (value, min, max) {
+        if (typeof min === "undefined") {
+            min = 0;
+        }
+        if (typeof max === "undefined") {
+            max = 1;
+        }
         return Math.max(min, Math.min(value, max));
     };
     // 计算向量之间角度的余弦，返回0到1之间的值
-    Utils.computeNdotL = function(n, l) {
+    Utils.computeNdotL = function (n, l) {
         var tmpN = Vector3.Normalize(n);
         var tmpL = Vector3.Normalize(l);
         return Math.max(0, Vector3.Dot(tmpN, tmpL));
     };
 })(Utils || (Utils = {}));
 
-var Color4 = (function() {
+var Color4 = (function () {
     function Color4(initialR, initialG, initialB, initialA) {
         this.r = initialR;
         this.g = initialG;
         this.b = initialB;
         this.a = initialA;
     }
-    Color4.prototype.toString = function() {
+
+    Color4.prototype.toString = function () {
         return "{R: " + this.r + " G:" + this.g + " B:" + this.b + " A:" + this.a + "}";
     };
     return Color4;
 })();
 
-var Vector2 = (function() {
+var Vector2 = (function () {
     function Vector2(initialX, initialY) {
         this.x = initialX;
         this.y = initialY;
     }
-    Vector2.prototype.toString = function() {
+
+    Vector2.prototype.toString = function () {
         return "{X: " + this.x + " Y:" + this.y + "}";
     };
-    Vector2.prototype.add = function(otherVector) {
+    Vector2.prototype.add = function (otherVector) {
         return new Vector2(this.x + otherVector.x, this.y + otherVector.y);
     };
-    Vector2.prototype.subtract = function(otherVector) {
+    Vector2.prototype.subtract = function (otherVector) {
         return new Vector2(this.x - otherVector.x, this.y - otherVector.y);
     };
-    Vector2.prototype.negate = function() {
+    Vector2.prototype.negate = function () {
         return new Vector2(-this.x, -this.y);
     };
-    Vector2.prototype.scale = function(scale) {
+    Vector2.prototype.scale = function (scale) {
         return new Vector2(this.x * scale, this.y * scale);
     };
-    Vector2.prototype.equals = function(otherVector) {
+    Vector2.prototype.equals = function (otherVector) {
         return this.x === otherVector.x && this.y === otherVector.y;
     };
-    Vector2.prototype.length = function() {
+    Vector2.prototype.length = function () {
         return Math.sqrt(this.x * this.x + this.y * this.y);
     };
-    Vector2.prototype.lengthSquared = function() {
+    Vector2.prototype.lengthSquared = function () {
         return (this.x * this.x + this.y * this.y);
     };
-    Vector2.prototype.normalize = function() {
+    Vector2.prototype.normalize = function () {
         var len = this.length();
         if (len === 0) {
             return;
@@ -104,44 +110,44 @@ var Vector2 = (function() {
     return Vector2;
 })();
 
-var Vector3 = (function() {
+var Vector3 = (function () {
     function Vector3(x, y, z) {
         this.x = x;
         this.y = y;
         this.z = z;
     };
 
-    Vector3.prototype.toString = function() {
+    Vector3.prototype.toString = function () {
         return "{X:" + this.x + " Y:" + this.y + " Z:" + this.z + "}";
     };
-    Vector3.prototype.add = function(other) {
+    Vector3.prototype.add = function (other) {
         return new Vector3(this.x + other.x, this.y + other.y, this.z + other.z);
     };
-    Vector3.prototype.subtract = function(other) {
+    Vector3.prototype.subtract = function (other) {
         return new Vector3(this.x - other.x, this.y - other.y, this.z - other.z);
     };
-    Vector3.prototype.negate = function() {
+    Vector3.prototype.negate = function () {
         return new Vector3(-this.x, -this.y, -this.z);
     };
-    Vector3.prototype.scale = function(scale) {
+    Vector3.prototype.scale = function (scale) {
         return new Vector3(this.x * scale, this.y * scale, this.z * scale);
     };
-    Vector3.prototype.equals = function(other) {
+    Vector3.prototype.equals = function (other) {
         return this.x == other.x && this.y == other.y && this.z == other.y;
     };
-    Vector3.prototype.multiply = function(other) {
+    Vector3.prototype.multiply = function (other) {
         return new Vector3(this.x * other.x, this.y * other.y, this.z * other.z);
     };
-    Vector3.prototype.divide = function(other) {
+    Vector3.prototype.divide = function (other) {
         return new Vector3(this.x / other.x, this.y / other.y, this.z / other.z);
     };
-    Vector3.prototype.length = function() {
+    Vector3.prototype.length = function () {
         return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z)
     };
-    Vector3.prototype.lengthSquared = function() {
+    Vector3.prototype.lengthSquared = function () {
         return (this.x * this.x + this.y * this.y + this.z * this.z);
     };
-    Vector3.prototype.normalize = function() {
+    Vector3.prototype.normalize = function () {
         var len = this.length();
         if (len == 0) {
             return;
@@ -175,6 +181,14 @@ var Vector3 = (function() {
 
         return new Vector3(x / w, y / w, z / w);
     };
+    Vector3.TransformCoordinatesW = function TransformCoordinatesW(vector, transformation) {
+        var x = (vector.x * transformation.m[0]) + (vector.y * transformation.m[4]) + (vector.z * transformation.m[8]) + transformation.m[12];
+        var y = (vector.x * transformation.m[1]) + (vector.y * transformation.m[5]) + (vector.z * transformation.m[9]) + transformation.m[13];
+        var z = (vector.x * transformation.m[2]) + (vector.y * transformation.m[6]) + (vector.z * transformation.m[10]) + transformation.m[14];
+        var w = (vector.x * transformation.m[3]) + (vector.y * transformation.m[7]) + (vector.z * transformation.m[11]) + transformation.m[15];
+
+        return {x: x/w, y: y/w, z: z, w: w};
+    };
     Vector3.TransformNormal = function TransformNormal(vector, transformation) {
         var x = (vector.x * transformation.m[0]) + (vector.y * transformation.m[4]) + (vector.z * transformation.m[8]);
         var y = (vector.x * transformation.m[1]) + (vector.y * transformation.m[5]) + (vector.z * transformation.m[9]);
@@ -199,7 +213,7 @@ var Vector3 = (function() {
     Vector3.Distance = function Distance(v1, v2) {
         return Math.sqrt(Vector3.DistanceSquare(v1, v2));
     };
-    Vector3.DistanceSquare = function(v1, v2) {
+    Vector3.DistanceSquare = function (v1, v2) {
         var x = v1.x - v2.x;
         var y = v1.y - v2.y;
         var z = v1.z - v2.z;
@@ -209,19 +223,19 @@ var Vector3 = (function() {
     return Vector3;
 })();
 
-var Matrix = (function() {
+var Matrix = (function () {
     function Matrix() {
         this.m = [];
     };
 
-    Matrix.prototype.isIdentity = function() {
+    Matrix.prototype.isIdentity = function () {
         if (this.m[0] != 1.0 || this.m[5] != 1.0 || this.m[10] != 1.0 || this.m[15] != 1.0)
             return false;
         if (this.m[1] != 0.0 || this.m[2] != 0.0 || this.m[3] != 0.0 || this.m[4] != 0.0 || this.m[6] != 0.0 || this.m[7] != 0.0 || this.m[8] != 0.0 || this.m[9] != 0.0 || this.m[11] != 0.0 || this.m[12] != 0.0 || this.m[13] != 0.0 || this.m[14] != 0.0)
             return false;
         return true;
     };
-    Matrix.prototype.determinant = function() {
+    Matrix.prototype.determinant = function () {
         var tmp1 = this.m[10] * this.m[15] - this.m[11] * this.m[14];
         var tmp2 = this.m[9] * this.m[15] - this.m[11] * this.m[13];
         var tmp3 = this.m[9] * this.m[14] - this.m[10] * this.m[13];
@@ -236,10 +250,10 @@ var Matrix = (function() {
 
         return this.m[0] * m1 - this.m[1] * m2 + this.m[2] * m3 - this.m[3] * m4;
     };
-    Matrix.prototype.toArray = function() {
+    Matrix.prototype.toArray = function () {
         return this.m;
     };
-    Matrix.prototype.invert = function() {
+    Matrix.prototype.invert = function () {
         var tmp1 = this.m[10] * this.m[15] - this.m[11] * this.m[14];
         var tmp2 = this.m[9] * this.m[15] - this.m[11] * this.m[13];
         var tmp3 = this.m[9] * this.m[14] - this.m[10] * this.m[13];
@@ -301,7 +315,7 @@ var Matrix = (function() {
         this.m[14] = -m12 * denominator;
         this.m[15] = m16 * denominator;
     };
-    Matrix.prototype.multiply = function(other) {
+    Matrix.prototype.multiply = function (other) {
         var result = new Matrix(other);
         result.m[0] = this.m[0] * other.m[0] + this.m[1] * other.m[4] + this.m[2] * other.m[8] + this.m[3] * other.m[12];
         result.m[1] = this.m[0] * other.m[1] + this.m[1] * other.m[5] + this.m[2] * other.m[9] + this.m[3] * other.m[13];
@@ -325,7 +339,7 @@ var Matrix = (function() {
         result.m[15] = this.m[12] * other.m[3] + this.m[13] * other.m[7] + this.m[14] * other.m[11] + this.m[15] * other.m[15];
         return result;
     };
-    Matrix.prototype.equals = function(value) {
+    Matrix.prototype.equals = function (value) {
         return (this.m[0] === value.m[0] && this.m[1] === value.m[1] && this.m[2] === value.m[2] && this.m[3] === value.m[3] && this.m[4] === value.m[4] && this.m[5] === value.m[5] && this.m[6] === value.m[6] && this.m[7] === value.m[7] && this.m[8] === value.m[8] && this.m[9] === value.m[9] && this.m[10] === value.m[10] && this.m[11] === value.m[11] && this.m[12] === value.m[12] && this.m[13] === value.m[13] && this.m[14] === value.m[14] && this.m[15] === value.m[15]);
     };
     Matrix.FromValues = function FromValues(initialM11, initialM12, initialM13, initialM14, initialM21, initialM22, initialM23, initialM24, initialM31, initialM32, initialM33, initialM34, initialM41, initialM42, initialM43, initialM44) {

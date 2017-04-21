@@ -65,7 +65,7 @@ var SoftRender;
             }
             //通过深度测试则重置深度值
             this.depthbuffer[index] = z;
-            index *= 4
+            index *= 4;
             this.backbufferdata[index] = color.r * 255;
             this.backbufferdata[index + 1] = color.g * 255;
             this.backbufferdata[index + 2] = color.b * 255;
@@ -103,20 +103,31 @@ var SoftRender;
         };
         Device.prototype.renderPipeline = function(mesh, shaderProgram, data) {
             var vertArr = mesh.Vertices;
+            var transVertArr = {};
             data.texture = mesh.Texture;
+            //顶点着色器
+            for (var i = 0; i < vertArr.length; i++) {
+                var tmp = shaderProgram.vertShader(vertArr[i], data);
+                tmp.rhw = 1/tmp.projPoint.w;
+                tmp.projPoint.z *= tmp.rhw;
+                if(tmp.uvCoord){
+                    //预备透视校正
+                    tmp.uvCoord.x *= tmp.rhw;   
+                    tmp.uvCoord.y *= tmp.rhw;
+                }
+                transVertArr[i] = tmp;
+            }
+            //光栅化
             for (var i = 0; i < mesh.Faces.length; i++) {
                 var face = mesh.Faces[i];
 
-                var va = vertArr[face.A];
-                var vb = vertArr[face.B];
-                var vc = vertArr[face.C];
-                var pA = shaderProgram.vertShader(va, data);
-                var pB = shaderProgram.vertShader(vb, data);
-                var pC = shaderProgram.vertShader(vc, data);
+                var pA = transVertArr[face.A];
+                var pB = transVertArr[face.B];
+                var pC = transVertArr[face.C];
+                
                 if (shaderProgram.surfShader != null) {
                     data.surfData = shaderProgram.surfShader(pA, pB, pC, data);
                 }
-
                 this.drawTriangle(pA, pB, pC, shaderProgram.fragShader, data);
             }
         };
@@ -165,20 +176,15 @@ var SoftRender;
                     if (a >= 0 && b >= 0 && c >= 0) {
                         var newp = {};
                         newp.ndotl = a * pa.ndotl + b * pb.ndotl + c * pc.ndotl;
-                        //光栅化的像素点, 注意下面对Z值进行透视修正插值1/z = a/z0 + b/z1 + c/z2
-                        var aOverZ0 = a / p0.z;
-                        var bOverZ1 = b / p1.z;
-                        var cOverZ2 = c / p2.z;
-                        var oneOverZ = aOverZ0 + bOverZ1 + cOverZ2;
-                        var pixel = new Vector3(x, y, oneOverZ);
-                        //纹理插值的透视修正
-                        var z = 1.0 / oneOverZ;
-                        var tu = (aOverZ0 * pa.uvCoord.x + bOverZ1 * pb.uvCoord.x + cOverZ2 * pc.uvCoord.x) *z;
-                        var tv = (aOverZ0 * pa.uvCoord.y + bOverZ1 * pb.uvCoord.y + cOverZ2 * pc.uvCoord.y) *z;
-                        // var u = (a * pa.uvCoord.x + b * pb.uvCoord.x + c * pc.uvCoord.x)*z;
-                        // var v = (a * pa.uvCoord.y + b * pb.uvCoord.y + c * pc.uvCoord.y)*z;
+                        //光栅化的像素点, 注意下面对W值进行透视修正插值1/w = a/w0 + b/w1 + c/w2
+                        var w = 1.0 / (a * pa.rhw + b * pb.rhw + c * pc.rhw);
+                        var z = 1.0 / ( a * p0.z + b * p1.z + c * p2.z);
+                        var pixel = new Vector3(x, y, z);
 
-                        newp.uvCoord = new Vector2(tu, tv);
+                        //纹理插值的透视修正
+                        var u = (a * pa.uvCoord.x + b * pb.uvCoord.x + c * pc.uvCoord.x) *w;
+                        var v = (a * pa.uvCoord.y + b * pb.uvCoord.y + c * pc.uvCoord.y) *w;
+                        newp.uvCoord = new Vector2(u, v);
 
                         newp.pixel = pixel;
                         var color = fragShader(newp, data);//着色
